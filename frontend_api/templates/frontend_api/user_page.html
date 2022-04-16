@@ -1,0 +1,110 @@
+<html>
+
+<head>
+    <title>{{ username }}'s Home Page</title>
+
+    <!-- bootstrap and jquery -->
+    <script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+        id="bootstrap-css">
+
+    <!-- vue developement and axios-->
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <!-- css -->
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'frontend_api/user_page.css' %}">
+</head>
+
+<body>
+
+    <div id="vue-app">
+        <h1 id="title-h">Chess Platform</h1>
+        <div class="container mt-4 mb-4 p-3 d-flex justify-content-center">
+            <div class="card p-4">
+                <div class=" image d-flex flex-column justify-content-center align-items-center"> <button
+                        class="btn btn-secondary"> <img src="https://i.imgur.com/wvxPV9S.png" height="100"
+                            width="100" /></button> <span class="name mt-3">[[ user.fullname ]]</span> <span
+                        class="idd">@[[ user.username ]]</span>
+                    <div class="d-flex flex-row justify-content-center align-items-center">
+                        <div class="d-flex flex-column col-md-8">
+                            <span class="number">[[ user.games ]] <span class="follow"> Games </span></span>
+                        </div>
+                        <div class="d-flex flex-column col-md-8">
+                            <span class="number">[[ user.puzzles ]] <span class="follow"> Puzzles </span></span>
+                        </div>
+
+                    </div>
+                    <div class="d-flex flex-row justify-content-center align-items-center">
+                        <div class="d-flex flex-column col-md-5"><span class="number">[[ user.wins ]] <span
+                                    class="follow">
+                                    Wins
+                                </span> </span> </div>
+                        <div class="d-flex flex-column col-md-5"><span class="number">[[user.draws ]] <span
+                                    class="follow"> Draws
+                                </span></span></div>
+                        <div class="d-flex flex-column col-md-5"><span class="number">[[user.loses ]] <span
+                                    class="follow">
+                                    Loses </span></span></div>
+                    </div>
+                    <div class="d-flex flex-row justify-content-center align-items-center"> <span class="number">[[
+                            user.game_rating ]] <span class="follow"> Game Rating </span></span> </div>
+                    <div class="d-flex flex-row justify-content-center align-items-center"> <span class="number">[[
+                            user.puzzle_rating ]] <span class="follow"> Puzzle Rating </span></span> </div>
+                    <div class=" d-flex mt-2 "> <button class="btn1 btn-dark ">Play</button> </div>
+                    <div class=" d-flex mt-2 w-10"> <button v-on:click="perform_puzzle_game"
+                            class="btn1 btn-dark ">Solve Puzzle</button> </div>
+                    <div class=" d-flex mt-2"> <button v-on:click="perform_logout" class="btn1 btn-dark ">Log
+                            out</button> </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="text/javascript">
+        let app = new Vue({
+            el: "#vue-app",
+            delimiters: ['[[', ']]'],
+            data: {
+                user: {
+                    fullname: "",
+                    username: "",
+                    game_rating: 0,
+                    puzzle_rating: 0,
+                    games: 0,
+                    puzzles: 0,
+                    wins: 0,
+                    loses: 0,
+                    draws: 0
+                }
+            },
+            methods: {
+                perform_logout: function () {
+                    window.location.replace("{% url 'login' %}")
+                },
+
+                perform_puzzle_game: function () {
+                    window.location.replace("{% url 'chess_board' %}?username=".concat(this.user.username))
+                }
+            },
+            beforeMount() {
+
+                axios.get("{% url 'perform_register' %}{{ username }}",)
+                    .then(response => {
+
+                        this.user.username = response.data.username
+                        this.user.fullname = response.data.fullname
+                        this.user.game_rating = response.data.game_rating
+                        this.user.puzzle_rating = response.data.puzzle_rating
+                        this.user.games = response.data.games
+                        this.user.wins = response.data.wins
+                        this.user.draws = response.data.draws
+                        this.user.loses = response.data.loses
+                        this.user.puzzles = response.data.puzzles
+                    })
+            },
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Platform - Chess Puzzles</title>
+
+    <!-- vue and axios -->
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <!-- css -->
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'frontend_api/bootstrap.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'frontend_api/chess_board.css' %}">
+
+</head>
+
+<body>
+    <div id="vue-app">
+        <div class="row">
+            <div class="column left">
+                <h1 id="title">Chess Puzzles</h1>
+                <h4 id="message">[[ active_message ]]</h5>
+                    <h4 class="info"> Puzzles solved this session: [[ solved_puzzles ]]</h5>
+                        <h4 class="info"> Remaining puzzles: [[ puzzles.length - solved_puzzles]]</h4>
+                        <button :disabled="not_solved" v-if="started" v-on:click="next_puzzle" type="button"
+                            class="btn btn-dark">Next Puzzle</button>
+                        <button v-else v-on:click="load_puzzles" class="btn ">Start</button>
+                        <button v-on:click="stop_solving" class="btn " type="button">Stop Solving</button>
+            </div>
+            <div class="column right wrapper">
+                <div class="top">
+                    <div class="wrapper-inner">
+                        <div class="box-inner" v-for="letter in letters">[[ letter ]]</div>
+                    </div>
+                </div>
+
+                <div class="box" v-for="n in 64" :key="n-1" v-on:click="perform_select(n - 1)"
+                    v-bind:style="compute_color(n - 1)"> [[ choose_layout(n) ]]
+                </div>
+
+
+                <div class="bottom">
+                    <div class="wrapper-inner">
+                        <div class="box-inner" v-for="letter in letters">[[ letter ]]</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let app = new Vue({
+            el: "#vue-app",
+            delimiters: ['[[', ']]'],
+            data: {
+                letters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+
+                decode_pieces: {
+                    'rw': '♖',
+                    'kw': '♘',
+                    'bw': '♗',
+                    'Kw': '♔',
+                    'Qw': '♕',
+                    'pw': '♙',
+                    'rb': '♜',
+                    'kb': '♞',
+                    'bb': '♝',
+                    'Kb': '♚',
+                    'Qb': '♛',
+                    'pb': '♟'
+                },
+
+                encode_pieces: {
+                    '♖': 'rw',
+                    '♘': 'kw',
+                    '♗': 'bw',
+                    '♔': 'Kw',
+                    '♕': 'Qw',
+                    '♙': 'pw',
+                    '♜': 'rb',
+                    '♞': 'kb',
+                    '♝': 'bb',
+                    '♚': 'Kb',
+                    '♛': 'Qb',
+                    '♟': 'pb'
+                },
+
+                messages: [
+                    "Press the start button to start solving!",
+                    "Solve this puzzle!",
+                    "You solved it!",
+                    "Congrats! You solved all the puzzles!",
+                    "That was a good move, go on!",
+                    "That is not the intended move! Try again!"
+                ],
+                active_message: "",
+                puzzle_index: -1,
+                current_puzzle: {
+                    board_state: [],
+                    moves: [],
+                    color: "white"
+                },
+
+                selected_piece: "", //database format
+                is_piece_selected: false,
+                last_wrong: "",
+                last_correct: "",
+
+                puzzles: [],
+                solved_puzzles: 0,
+                rating_gain_per_puzzle: 8,
+                started: false,
+                not_solved: true,
+                username: "{{ username }}"
+            },
+
+            beforeMount() {
+                this.active_message = this.messages[0]
+            },
+
+            methods: {
+
+                compute_color: function (square) {
+
+                    let pos = this.convert_square_to_position_string(square)
+
+                    if (this.selected_piece.slice(2) == pos) {
+
+                        return "background-color: #7df4fa"
+                    } else {
+
+                        if (this.last_correct == pos) {
+                            return "background-color: #25fa54"
+                        } else if (this.last_wrong == pos) {
+                            return "background-color: #fa4323"
+                        } else if ((square % 2 + Math.floor(square / 8) % 2) % 2 == 0) {
+                            return "background-color: white"
+                        } else {
+                            return "background-color: #037ffc"
+                        }
+                    }
+
+                },
+
+                perform_select: async function (square) {
+
+                    let pos = this.convert_square_to_position_string(square)
+                    let charater = this.read_configuration(square)
+
+                    if (this.is_piece_selected) {
+
+                        if (this.current_puzzle.moves.length) {
+                            if (this.selected_piece == this.current_puzzle.moves[0]["start"] && pos == this.current_puzzle.moves[0]["end"].slice(2)) {
+                                // remove piece on this square from board configuration
+
+                                let letters = ""
+
+                                this.current_puzzle.board_state.forEach(element => {
+                                    if (element.includes(pos)) {
+                                        letters = element.slice(0, 2)
+                                    }
+                                });
+
+                                if (letters) {
+                                    let i = this.current_puzzle.board_state.indexOf((letters + pos));
+                                    if (i > -1) {
+                                        this.current_puzzle.board_state.splice(i, 1);
+                                    } else {
+                                        console.log("n-am gasit piece ul de remove")
+                                    }
+
+                                }
+
+
+                                // remove piece on selected square from board configuration
+                                i = this.current_puzzle.board_state.indexOf(this.selected_piece);
+                                if (i > -1) {
+                                    this.current_puzzle.board_state.splice(i, 1);
+                                } else {
+                                    console.log("selected piece not in board state")
+                                }
+
+                                // add new piece to board configuration
+                                this.current_puzzle.board_state.push(this.current_puzzle.moves[0]["end"])
+                                //remove move from moves
+                                this.current_puzzle.moves.shift()
+
+                                if (this.current_puzzle.moves.length) {
+
+                                    let sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+                                    let move = this.current_puzzle.moves[0]
+                                    let p = move["end"].slice(2)
+                                    let letters = ""
+
+                                    this.current_puzzle.board_state.forEach(element => {
+                                        if (element.includes(p)) {
+                                            letters = element.slice(0, 2)
+                                        }
+                                    });
+
+                                    i = this.current_puzzle.board_state.indexOf((letters + p))
+                                    if (i > -1) {
+                                        this.current_puzzle.board_state.splice(i, 1);
+                                    } else {
+                                        console.log("selected piece not in board state - by computer")
+                                    }
+
+                                    i = this.current_puzzle.board_state.indexOf(move["start"])
+                                    if (i > -1) {
+                                        this.current_puzzle.board_state.splice(i, 1);
+                                    } else {
+                                        console.log("selected piece not in board state - by computer")
+                                    }
+
+                                    this.current_puzzle.board_state.push(move["end"])
+
+                                    this.current_puzzle.moves.shift()
+
+                                    this.active_message = this.messages[4]
+                                }
+                                else {
+                                    this.active_message = this.messages[2]
+                                    this.not_solved = false
+                                    this.solved_puzzles += 1
+                                }
+
+                                this.last_correct = pos
+
+                            } else {
+                                this.active_message = this.messages[5]
+                                this.last_wrong = pos;
+                            }
+                        } else {
+                            this.active_message = this.messages[2]
+                            this.not_solved = false
+                            
+                        }
+
+                        this.is_piece_selected = false
+
+                    } else {
+
+                        if (charater != "") {
+                            let piece_code = this.encode_pieces[charater]
+                            this.selected_piece = piece_code + pos
+                            this.is_piece_selected = true
+                            console.log("piece is selected: " + this.selected_piece)
+
+                            this.last_wrong = ""
+                            this.last_correct = ""
+                        }
+                    }
+                },
+
+                default_placement: function (square) {
+
+                    //rooks
+                    if (square == 1 || square == 8)
+                        return this.decode_pieces['rb']
+                    if (square == 57 || square == 64)
+                        return this.decode_pieces['rw']
+
+                    //pawns
+                    if (square >= 9 && square <= 16)
+                        return this.decode_pieces['pb']
+                    if (square >= 49 && square <= 56)
+                        return this.decode_pieces['pw']
+
+                    //knights
+                    if (square == 2 || square == 7)
+                        return this.decode_pieces['kb']
+                    if (square == 58 || square == 63)
+                        return this.decode_pieces['kw']
+
+                    //bishops
+                    if (square == 3 || square == 6)
+                        return this.decode_pieces['bb']
+                    if (square == 59 || square == 62)
+                        return this.decode_pieces['bw']
+
+                    //queens
+                    if (square == 4)
+                        return this.decode_pieces['Qb']
+                    if (square == 60)
+                        return this.decode_pieces['Qw']
+
+                    //kings
+                    if (square == 5)
+                        return this.decode_pieces['Kb']
+                    if (square == 61)
+                        return this.decode_pieces['Kw']
+                },
+
+                choose_layout: function (square) {
+
+                    if (!this.started) {
+                        return this.default_placement(square)
+                    } else {
+                        return this.read_configuration(square - 1)
+                    }
+                },
+
+                load_puzzles: async function () {
+
+                    await axios.get("{% url 'puzzle' %}")
+                        .then(response => {
+                            this.puzzles = response.data
+                        })
+
+
+                    if (!this.started) {
+                        this.started = true;
+                    }
+
+                    this.next_puzzle()
+                },
+
+                next_puzzle: function () {
+                    this.not_solved = true
+                    this.active_message = this.messages[1]
+
+                    this.puzzle_index++
+
+                    if (this.puzzle_index >= this.puzzles.length) {
+                        this.active_message = this.messages[3]
+                    } else {
+                        this.load_configuration()
+                    }
+                },
+
+                load_configuration: function () {
+                    this.current_puzzle.board_state = this.puzzles[this.puzzle_index].board_state
+                    this.current_puzzle.moves = this.puzzles[this.puzzle_index].moves
+                    this.current_puzzle.color = this.puzzles[this.puzzle_index].color
+                },
+
+                convert_square_to_position_string: function (square) {
+                    let pos_string = ""
+
+                    if (this.current_puzzle.color == "white") {
+                        pos_string = String.fromCharCode(97 + square % 8, 48 + 8 - Math.floor(square / 8))
+                    } else {
+                        pos_string = String.fromCharCode(104 - square % 8, 48 + 1 + Math.floor(square / 8))
+                    }
+
+                    return pos_string
+                },
+
+                read_configuration: function (square) {
+
+                    let pos_string = this.convert_square_to_position_string(square)
+                    let letter = "";
+
+                    this.current_puzzle.board_state.forEach(element => {
+                        if (element.includes(pos_string)) {
+                            letter = this.decode_pieces[element.slice(0, 2)]
+                        }
+                    });
+
+                    return letter
+                },
+
+                stop_solving: async function () {
+
+                    await axios.put("{% url 'perform_register' %}".concat(this.username + "/"), {
+                        "username": this.username,
+                        "puzzle_rating": this.solved_puzzles * this.rating_gain_per_puzzle,
+                        "puzzles": this.solved_puzzles
+                    })
+                        .then(response => {
+                            console.log(response.data)
+                        })
+
+                    window.location.replace("{% url 'user_page' %}?username=".concat(this.username))
+                },
+            }
+        })
+    </script>
+
+</body>
+
+</html>
