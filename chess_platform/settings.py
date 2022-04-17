@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-rwhli=j%$sm(i(!g2vp9j()s4b_tl4pg^+7zlrh)6bl-#%gh(j"
+SECRET_KEY =
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -82,7 +82,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "chess_db",
         "USER": "root",
-        "PASSWORD": "chessplatform",
+        "PASSWORD": ,
         "HOST": "localhost",
         "PORT": "3306",
     }
